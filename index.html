@@ -105,7 +105,7 @@
     <link rel="apple-touch-icon" href="https://placehold.co/180x180/000000/FFFFFF?text=PWA">
     <link rel="apple-touch-startup-image" href="https://placehold.co/1125x2436/000000/FFFFFF?text=Loading">
 
-    <link rel="manifest" href="/manifest.json">
+    <link rel="manifest" href="/school-list/manifest.json">
 </head>
 <body class="min-h-screen flex items-center justify-center p-4 transition-colors duration-300 ease-in-out">
 
@@ -907,8 +907,9 @@
         // Register the Service Worker (PWA functionality)
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                // FIXED: Service Worker path for static.run root deployment
-                navigator.serviceWorker.register('/service-worker.js', { scope: '/' })
+                // FIXED: Service Worker path for GitHub Pages deployment
+                // Make sure service-worker.js is in the /school-list/ directory on your GitHub Pages repo
+                navigator.serviceWorker.register('/school-list/service-worker.js', { scope: '/school-list/' })
                     .then(registration => {
                         console.log('Service Worker registered with scope:', registration.scope);
                     })
