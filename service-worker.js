@@ -3,14 +3,13 @@
 // Cache assets for offline use (optional, but good for PWA)
 const CACHE_NAME = 'school-tasks-cache-v1';
 const urlsToCache = [
-  '/', // Adjusted to root path for static.run
+  '/', // Adjusted to root path for GitHub Pages
   '/index.html', // Or your main HTML file
-  '/manifest.json',
+  '/manifest.json', // Adjusted to root path for GitHub Pages
   // Add other assets you want to cache, e.g., CSS, JS, images
   'https://cdn.tailwindcss.com',
   'https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap',
-  // Example for icons if they are at /images/icons/ in your static.run deployment
-  // Make sure these paths are correct relative to the root of your static.run deployment
+  // Example for icons if they are at /images/icons/ in your GitHub Pages deployment
   '/images/icons/icon-72x72.png',
   '/images/icons/icon-96x96.png',
   '/images/icons/icon-128x128.png',
@@ -49,22 +48,18 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// Listen for messages from the main application (e.g., to show a notification)
-self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SHOW_NOTIFICATION') {
-    console.log('Service Worker: Received SHOW_NOTIFICATION message.', event.data);
-    const { title, body, icon } = event.data;
-    event.waitUntil(
-      self.registration.showNotification(title, {
-        body: body,
-        icon: icon,
-        badge: icon, // Optional: badge for Android
-        vibrate: [200, 100, 200], // Optional: vibration pattern
-        tag: 'task-notification', // Group notifications
-        renotify: true // Show notification again if content changes
-      })
-    );
-  }
+// Add a listener for messages from the main thread (for notifications)
+self.addEventListener('message', event => {
+    if (event.data && event.data.action === 'showNotification') {
+        const { title, options } = event.data;
+        self.registration.showNotification(title, options)
+            .then(() => {
+                console.log('Notification shown successfully via Service Worker.');
+            })
+            .catch(error => {
+                console.error('Error showing notification via Service Worker:', error);
+            });
+    }
 });
 
 // Optional: Handle notification clicks (e.g., open the app)
@@ -82,7 +77,7 @@ self.addEventListener('notificationclick', (event) => {
       }
       // If no window is open, open a new one
       if (clients.openWindow) {
-        return clients.openWindow('/'); // Adjusted to root path for static.run
+        return clients.openWindow('/'); // Adjusted to root path for GitHub Pages
       }
     })
   );
