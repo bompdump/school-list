@@ -341,7 +341,7 @@
 
                 try {
                     const projectIdForPath = auth.app.options.projectId; 
-                    await addDoc(collection(db, `artifacts/${projectIdForPath}/users/${currentUserId}/tasks`), {
+                    const docRef = await addDoc(collection(db, `artifacts/${projectIdForPath}/users/${currentUserId}/tasks`), {
                         text: text,
                         subject: subject,
                         doDate: doDate,
@@ -350,7 +350,13 @@
                         completed: false,
                         timestamp: Date.now()
                     });
-                    console.log("Task added successfully!");
+                    console.log("Task added successfully with ID:", docRef.id);
+                    
+                    // Schedule notification after task is added
+                    if (doDate && doTime) {
+                        scheduleTaskNotification(docRef.id, text, doDate, doTime);
+                    }
+
                     newTaskInput.value = '';
                     newSubjectInput.value = '';
                     newDoDateInput.value = '';
@@ -449,6 +455,77 @@
                 }
             }
         }
+
+        /**
+         * Function to schedule a notification for a task
+         * @param {string} taskId - The ID of the task.
+         * @param {string} taskDescription - The description of the task.
+         * @param {string} doDate - The do date in YYYY-MM-DD format.
+         * @param {string} doTime - The do time in HH:MM format.
+         */
+        async function scheduleTaskNotification(taskId, taskDescription, doDate, doTime) {
+            // Check if notifications are enabled and permission is granted
+            if (!('Notification' in window) || Notification.permission !== 'granted') {
+                console.warn("Notifications are not enabled or permission not granted. Cannot schedule notification.");
+                return;
+            }
+
+            // Combine doDate and doTime into a single Date object
+            // Assuming doDate is YYYY-MM-DD and doTime is HH:MM
+            const notificationDateTimeString = `${doDate}T${doTime}:00`; // Add seconds for full ISO format
+            const notificationDate = new Date(notificationDateTimeString);
+
+            const now = new Date();
+
+            // Only schedule if the notification date is in the future
+            if (notificationDate > now) {
+                const timeUntilNotification = notificationDate.getTime() - now.getTime();
+
+                console.log(`Scheduling notification for Task ID: ${taskId} at ${notificationDate.toLocaleString()}`);
+                console.log(`Time until notification: ${timeUntilNotification / 1000} seconds`);
+
+                // Use setTimeout to schedule the notification.
+                // For a real-world PWA, this should ideally be handled by a Push API
+                // from a server for persistent notifications, but for client-side
+                // scheduling, setTimeout is the primary mechanism.
+                // For long delays, this might not be reliable if the browser tab is closed.
+                setTimeout(async () => {
+                    // Ensure the service worker is active before showing notification
+                    const registration = await navigator.serviceWorker.getRegistration();
+                    if (registration && registration.active) {
+                        registration.active.postMessage({
+                            action: 'showNotification',
+                            title: 'School Task Reminder!',
+                            options: {
+                                body: `Task: ${taskDescription} due on ${doDate} at ${doTime}`,
+                                icon: '/images/icons/icon-192x192.png', // UPDATED path for root deployment
+                                badge: '/images/icons/icon-72x72.png', // UPDATED path for root deployment
+                                data: {
+                                    taskId: taskId,
+                                    doDate: doDate,
+                                    doTime: doTime
+                                },
+                                vibrate: [200, 100, 200, 100, 200],
+                                tag: taskId // Use task ID as a tag to prevent duplicate notifications for the same task
+                            }
+                        });
+                        console.log(`Notification sent for Task ID: ${taskId}`);
+                    } else {
+                        console.warn("Service Worker not active, cannot show notification. Falling back to direct Notification API.");
+                        // Fallback for immediate notification if SW is not available
+                        if (Notification.permission === "granted") {
+                            new Notification('School Task Reminder!', {
+                                body: `Task: ${taskDescription} due on ${doDate} at ${doTime}`,
+                                icon: '/images/icons/icon-192x192.png' // UPDATED path for root deployment
+                            });
+                        }
+                    }
+                }, timeUntilNotification);
+            } else {
+                console.log("Notification date is in the past or current, not scheduling.");
+            }
+        }
+
 
         /**
          * Sets up a real-time listener for tasks from Firestore.
@@ -768,6 +845,10 @@
                         completed: !taskToToggle.completed // Toggle the status
                     });
                 }
+                // If the task is completed, ensure any pending notifications are cleared
+                if (taskToToggle && !taskToToggle.completed) { // If it was just marked as completed
+                    // No direct way to cancel setTimeout from SW, but we can use tags to prevent new ones
+                }
             } catch (e) {
                 console.error("Error updating document in Firestore: ", e);
                 console.error("Possible cause: Firestore security rules preventing write access. Check your Firebase console.");
@@ -834,7 +915,7 @@
                                                     upcomingTasks.map(t => `${t.subject ? t.subject + ': ' : ''}${t.text}`).join('\n');
 
                         // Send notification message to Service Worker
-                        sendNotificationToServiceWorker("Upcoming Tasks!", notificationMessage, "https://placehold.co/48x48/000000/FFFFFF?text=🔔");
+                        sendNotificationToServiceWorker("Upcoming Tasks!", notificationMessage, "/images/icons/icon-192x192.png"); // UPDATED path for root deployment
                         localStorage.setItem(NOTIFICATION_LAST_SENT_KEY, today.toISOString());
                     }
                 }
@@ -907,7 +988,7 @@
         // Register the Service Worker (PWA functionality)
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                // FIXED: Service Worker path for static.run root deployment
+                // UPDATED: Service Worker path for root deployment
                 navigator.serviceWorker.register('/service-worker.js', { scope: '/' })
                     .then(registration => {
                         console.log('Service Worker registered with scope:', registration.scope);
